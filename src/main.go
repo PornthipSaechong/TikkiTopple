@@ -88,12 +88,20 @@ func (g Game) Start(playerNumber int) Game {
 	g2 := []Tiki{t4,t5,t6}
 	g3 := []Tiki{t7,t8,t9}
 
+	r := rand.New(rand.NewSource(time.Now().Unix()))
+
 	b := Board{}
 	g.Board = b.New(g1,g2,g3)
 
 	p := Player{}
 	p = p.New()
+
 	for i := 0; i<playerNumber; i++ {
+		s := SecretCard{}
+		s.First = g1[r.Intn(len(g1))]
+		s.Second = g2[r.Intn(len(g2))]
+		s.Third = g3[r.Intn(len(g3))]
+		p.Secret = s 
 		g.Players = append(g.Players, p)
 	}
 	fmt.Println(&p, &g.Players[0], &g.Players[1])
