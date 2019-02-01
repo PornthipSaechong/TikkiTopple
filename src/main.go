@@ -17,6 +17,11 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		game = game.Start(2)
 		fmt.Println(game)
 		fmt.Fprint(w, "<h1>Test</h1>") // Fprint write to a buffer output
+		player1 := game.Players[0]
+		// player2 := game.Players[1]
+		board := game.Board
+		fmt.Println(player1.Cards)
+		board = player1.Move(player1.Cards[0], 9, board)
 	}
 }
 
@@ -46,15 +51,7 @@ type Tiki struct{
 }
 
 type Board struct{
-	Position1 Tiki
-	Position2 Tiki
-	Position3 Tiki
-	Position4 Tiki
-	Position5 Tiki
-	Position6 Tiki
-	Position7 Tiki
-	Position8 Tiki
-	Position9 Tiki
+	Tiki []Tiki
 }
 
 type SecretCard struct{
@@ -95,7 +92,7 @@ func (g Game) Start(playerNumber int) Game {
 
 	p := Player{}
 	p = p.New()
-
+	
 	for i := 0; i<playerNumber; i++ {
 		s := SecretCard{}
 		s.First = g1[r.Intn(len(g1))]
@@ -104,8 +101,7 @@ func (g Game) Start(playerNumber int) Game {
 		p.Secret = s 
 		g.Players = append(g.Players, p)
 	}
-	fmt.Println(&p, &g.Players[0], &g.Players[1])
-	
+	// fmt.Printf("%p,%p", &g.Players[0], &g.Players[1])
 	return g
 }
 
@@ -118,15 +114,9 @@ func (b Board) New(g1 , g2, g3 []Tiki) Board {
 	perm := r.Perm(3)
 	fmt.Println(perm)
 	gA := [][]Tiki {g1,g2,g3}
-	b.Position1 = gA[perm[0]][0]
-	b.Position2 = gA[perm[0]][1]
-	b.Position3 = gA[perm[0]][2]
-	b.Position4 = gA[perm[1]][0]
-	b.Position5 = gA[perm[1]][1]
-	b.Position6 = gA[perm[1]][2]
-	b.Position7 = gA[perm[2]][0]
-	b.Position8 = gA[perm[2]][1]
-	b.Position9 = gA[perm[2]][2]
+	b.Tiki = append(b.Tiki,gA[perm[0]]...)
+	b.Tiki = append(b.Tiki,gA[perm[1]]...)
+	b.Tiki = append(b.Tiki,gA[perm[2]]...)
 	return b	
 }
 
@@ -136,7 +126,7 @@ func (p Player) New() Player {
 	c3 := Card{"Move3","UP",3}
 	cx := Card{"X","X",1}
 	cdrop := Card{"Drop","DROP",0}
-	p.Cards = make([]Card, 7, 7)
+	p.Cards = make([]Card, 0, 7)
 	p.Cards = append(p.Cards, c1)
 	p.Cards = append(p.Cards, c1)
 	p.Cards = append(p.Cards, c2)
@@ -159,8 +149,42 @@ func Shuffle(t []Tiki) []Tiki {
 	return t
 } 
 
-
-func (p Player) Move(c Card, t Tiki, b Board) {
+func (p Player) Move(c Card, pos int, b Board) Board {
+	// pos is not index of array
 	// what type of card is used
-	
+	fmt.Println(c.Action)
+	t := b.Tiki[pos-1]
+	switch c.Action {
+		case "UP":
+			if pos-1-c.Count<0 {
+				fmt.Println("Invalid move")
+			} else {
+				// move the tiki on the board
+				b.MoveUp(pos-1,c.Count)
+			}				
+		case "X":
+			fmt.Printf("Destroy tiki: %v\n", t.Name)
+		case "DROP":
+			fmt.Printf("Drop tiki: %v\n", t.Name)
+		default:
+			fmt.Println("Invalid input")
+	}
+	return b
 } 
+
+func (b Board) MoveUp(index, count int) Board {
+	newPos := index-count
+	fmt.Println("new position", newPos)
+	// remove the tiki from the chosen position
+	chosen := b.Tiki[index]
+	fmt.Println("chosen", chosen)
+	b.Tiki = append(b.Tiki[:index], b.Tiki[index+1:]...)
+	fmt.Println("removed chosen tiki array", b.Tiki)
+	// insert tiki into position
+	b.Tiki = append(b.Tiki,Tiki{})
+	copy(b.Tiki[newPos+1:],b.Tiki[newPos:])
+	b.Tiki[newPos] = chosen
+	fmt.Println("inserted right array", b.Tiki)
+	fmt.Printf("Moving tiki %v by %v\n", chosen.Name, count)
+	return b
+}
