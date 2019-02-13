@@ -29,6 +29,12 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("After")
 		fmt.Println(board)
 		fmt.Println(player1.Cards)
+		if game.CheckEnd() {
+			fmt.Println("Game has ended")
+		} else {
+			fmt.Println("Game is still ongoing")
+		}
+
 	}
 }
 
@@ -110,6 +116,20 @@ func (g Game) Start(playerNumber int) Game {
 	}
 	// fmt.Printf("%p,%p", &g.Players[0], &g.Players[1])
 	return g
+}
+
+
+func (g Game) CheckEnd() bool {
+	if len(g.Board.Tiki) == 3 {
+		return true
+	}
+	for p := 0; p<len(g.Players); p++ {
+		if len(g.Players[p].Cards) == 0 {
+			return true
+		}
+	}
+	
+	return false
 }
 
 func (b Board) New(g1 , g2, g3 []Tiki) Board {
