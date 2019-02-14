@@ -23,6 +23,7 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("Before")
 		fmt.Println(board)
 		fmt.Println(player1.Cards)
+		fmt.Println(player1.Secret)
 		cardIndex := 7 - 1 // input as array instead of card
 		tikkiIndex := 1 - 1
 		player1, board = player1.Move(cardIndex, tikkiIndex, board)
@@ -33,6 +34,9 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			fmt.Println("Game has ended")
 		} else {
 			fmt.Println("Game is still ongoing")
+			for i:=0; i<len(game.Players); i++ {
+				fmt.Printf("Player %v scored %v\n", i, game.Players[i].CheckScore(board))
+			}
 		}
 
 	}
@@ -55,6 +59,7 @@ type Game struct {
 	Players []Player
 	Tikis []Tiki
 	Discard []Card
+	CurrentPlayer int
 }
 
 type Tiki struct{
@@ -84,6 +89,20 @@ type Player struct {
 	Secret SecretCard
 }
 
+
+func Shuffle(t []Tiki) []Tiki {
+	// fmt.Println(t)
+	// fmt.Println(time.Now().Unix())
+	r := rand.New(rand.NewSource(time.Now().Unix()))
+	for n:=len(t); n>0; n-- {
+		rInt:= r.Intn(len(t))
+		// fmt.Println("random int ", rInt)
+		t[n-1], t[rInt] = t[rInt], t[n-1]
+	}
+	return t
+} 
+
+// game functions
 func (g Game) Start(playerNumber int) Game {
 	t1 := Tiki{"Red","1","r1"}
 	t2 := Tiki{"Orange","1","o1"}
@@ -115,10 +134,13 @@ func (g Game) Start(playerNumber int) Game {
 		g.Players = append(g.Players, p)
 	}
 	// fmt.Printf("%p,%p", &g.Players[0], &g.Players[1])
+
+	g.CurrentPlayer = 0
+	
 	return g
 }
 
-
+// game functions
 func (g Game) CheckEnd() bool {
 	if len(g.Board.Tiki) == 3 {
 		return true
@@ -132,6 +154,16 @@ func (g Game) CheckEnd() bool {
 	return false
 }
 
+func (g Game) NextTurn() {
+	if g.CurrentPlayerIndex < len(g.Players)-1 {
+		g.CurrentPlayerIndex += 1
+	} else {
+		g.CurrentPlayerIndex = 0
+	}
+	return
+}
+
+// board functions
 func (b Board) New(g1 , g2, g3 []Tiki) Board {
 	g1 = Shuffle(g1)
 	g2 = Shuffle(g2)
@@ -147,6 +179,39 @@ func (b Board) New(g1 , g2, g3 []Tiki) Board {
 	return b	
 }
 
+
+func (b Board) Move(index, count int, direction string) Board {
+	var newPos int
+	if (direction == "up") {
+		newPos = index-count
+	} else if (direction == "down") {
+		newPos = index+count
+	} else {
+		fmt.Println("Invalid direction")
+		return b
+	}
+	fmt.Println("new position", newPos)
+	// remove the tiki from the chosen position
+	chosen := b.Tiki[index]
+	fmt.Println("chosen", chosen)
+	b.Tiki = append(b.Tiki[:index], b.Tiki[index+1:]...)
+	fmt.Println("removed chosen tiki array", b.Tiki)
+	// insert tiki into position
+	b.Tiki = append(b.Tiki,Tiki{})
+	copy(b.Tiki[newPos+1:],b.Tiki[newPos:])
+	b.Tiki[newPos] = chosen
+	fmt.Println("inserted right array", b.Tiki)
+	fmt.Printf("Moving tiki %v by %v\n", chosen.Name, count)
+	return b
+}
+
+func (b Board) Remove() Board {
+	lastIndex := len(b.Tiki)-1
+	b.Tiki = append(b.Tiki[:lastIndex], b.Tiki[lastIndex+1:]...)
+	return b
+}
+
+// player functions
 func (p Player) New() Player {
 	c1 := Card{"Move1","UP",1}
 	c2 := Card{"Move2","UP",2}
@@ -164,17 +229,6 @@ func (p Player) New() Player {
 	return p
 }
 
-func Shuffle(t []Tiki) []Tiki {
-	// fmt.Println(t)
-	// fmt.Println(time.Now().Unix())
-	r := rand.New(rand.NewSource(time.Now().Unix()))
-	for n:=len(t); n>0; n-- {
-		rInt:= r.Intn(len(t))
-		// fmt.Println("random int ", rInt)
-		t[n-1], t[rInt] = t[rInt], t[n-1]
-	}
-	return t
-} 
 
 func (p Player) Move(cardIndex int, posIndex int, b Board) (Player, Board) {
 	c := p.Cards[cardIndex] // get card from index input
@@ -209,33 +263,16 @@ func (p Player) Move(cardIndex int, posIndex int, b Board) (Player, Board) {
 	return p,b
 } 
 
-func (b Board) Move(index, count int, direction string) Board {
-	var newPos int
-	if (direction == "up") {
-		newPos = index-count
-	} else if (direction == "down") {
-		newPos = index+count
-	} else {
-		fmt.Println("Invalid direction")
-		return b
+func (p Player) CheckScore(b Board) int {
+	score := 0
+	if p.Secret.First == b.Tiki[0] {
+		score += 9
 	}
-	fmt.Println("new position", newPos)
-	// remove the tiki from the chosen position
-	chosen := b.Tiki[index]
-	fmt.Println("chosen", chosen)
-	b.Tiki = append(b.Tiki[:index], b.Tiki[index+1:]...)
-	fmt.Println("removed chosen tiki array", b.Tiki)
-	// insert tiki into position
-	b.Tiki = append(b.Tiki,Tiki{})
-	copy(b.Tiki[newPos+1:],b.Tiki[newPos:])
-	b.Tiki[newPos] = chosen
-	fmt.Println("inserted right array", b.Tiki)
-	fmt.Printf("Moving tiki %v by %v\n", chosen.Name, count)
-	return b
-}
-
-func (b Board) Remove() Board {
-	lastIndex := len(b.Tiki)-1
-	b.Tiki = append(b.Tiki[:lastIndex], b.Tiki[lastIndex+1:]...)
-	return b
+	if p.Secret.Second == b.Tiki[0] || p.Secret.Second == b.Tiki[1] {
+		score += 5
+	}
+	if p.Secret.Third == b.Tiki[0] || p.Secret.Third == b.Tiki[1] || p.Secret.Third == b.Tiki[2] {
+		score += 2
+	}
+	return score
 }
