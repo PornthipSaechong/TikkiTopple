@@ -5,6 +5,10 @@ import (
 	"net/http"
 	"math/rand"
 	"time"
+	"bufio"
+	"os"
+	"strconv"
+	"strings"
 )
 
 type Server struct{}
@@ -13,39 +17,80 @@ type Server struct{}
 func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	fmt.Println(r)
 	if r.Method == "GET" {
-		game := Game{}
-		game = game.Start(2)
-		fmt.Println(game)
-		fmt.Fprint(w, "<h1>Test</h1>") // Fprint write to a buffer output
-		player1 := game.Players[0]
-		// player2 := game.Players[1]
-		board := game.Board
-		fmt.Println("Before")
-		fmt.Println(board)
-		fmt.Println(player1.Cards)
-		fmt.Println(player1.Secret)
-		cardIndex := 7 - 1 // input as array instead of card
-		tikkiIndex := 1 - 1
-		player1, board = player1.Move(cardIndex, tikkiIndex, board)
-		fmt.Println("After")
-		fmt.Println(board)
-		fmt.Println(player1.Cards)
+		fmt.Fprint(w, "<h1>Test</h1>") // Fprint write to a buffer output	
+	}
+}
+
+func main (){
+	// var s Server
+	// err := http.ListenAndServe("localhost:4000", s)
+	// checkError(err)
+
+	// GAME
+	game := Game{}
+	fmt.Println("Start Tiki Topple\n Enter Player number: ")
+	reader := bufio.NewReader(os.Stdin)
+	text, _ := reader.ReadString('\n')
+	text = strings.Replace(text, "\r\n", "", -1)
+	fmt.Println(text)
+	playerNumber, err := strconv.ParseInt(text, 0, 32)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println("player number", playerNumber)
+	fmt.Printf("Starting game with %v players\n", playerNumber)
+	game = game.Start(int(playerNumber))
+	board := game.Board
+	player := game.Players[game.CurrentPlayerIndex]
+
+	sum := 1
+
+	for sum > 0 {
+		fmt.Printf("Player %v turn\n", game.CurrentPlayerIndex)
+		player = game.Players[game.CurrentPlayerIndex]
+
+		fmt.Println("The board", board)
+		fmt.Println("Your cards", player.Cards)
+		fmt.Println("Your secret", player.Secret)
+
+		fmt.Println("Enter card position: ")
+		text, _ = reader.ReadString('\n')
+		text = strings.Replace(text, "\r\n", "", -1)
+		cardPosition, _ := strconv.ParseInt(text, 0, 32)
+		cardIndex := int(cardPosition) - 1 // input as array instead of card
+
+		fmt.Println("Enter tikki position: ")
+		text, _ = reader.ReadString('\n')
+		text = strings.Replace(text, "\r\n", "", -1)
+		tikiPosition, err := strconv.ParseInt(text, 0, 32)
+		if err != nil {
+			fmt.Println(err)
+			break
+		}
+		tikkiIndex := int(tikiPosition) - 1
+
+		player, board = player.Move(cardIndex, tikkiIndex, board)
+
 		if game.CheckEnd() {
 			fmt.Println("Game has ended")
+			break
 		} else {
 			fmt.Println("Game is still ongoing")
 			for i:=0; i<len(game.Players); i++ {
 				fmt.Printf("Player %v scored %v\n", i, game.Players[i].CheckScore(board))
 			}
+			game = game.NextTurn()
 		}
 
+		fmt.Println("The board after move", board)
 	}
-}
-
-func main (){
-	var s Server
-	err := http.ListenAndServe("localhost:4000", s)
-	checkError(err)
+	
+	// fmt.Println("Enter Card Index: ")
+	// text, _ = reader.ReadString('\n')
+	// fmt.Println(text)
+	// fmt.Println("Enter Tiki Index: ")
+	// text, _ = reader.ReadString('\n')
+	// fmt.Println(text)
 }
 
 func checkError (err error) {
@@ -59,7 +104,7 @@ type Game struct {
 	Players []Player
 	Tikis []Tiki
 	Discard []Card
-	CurrentPlayer int
+	CurrentPlayerIndex int
 }
 
 type Tiki struct{
@@ -123,9 +168,9 @@ func (g Game) Start(playerNumber int) Game {
 	g.Board = b.New(g1,g2,g3)
 
 	p := Player{}
-	p = p.New()
 	
 	for i := 0; i<playerNumber; i++ {
+		p = p.New()
 		s := SecretCard{}
 		s.First = g1[r.Intn(len(g1))]
 		s.Second = g2[r.Intn(len(g2))]
@@ -135,8 +180,8 @@ func (g Game) Start(playerNumber int) Game {
 	}
 	// fmt.Printf("%p,%p", &g.Players[0], &g.Players[1])
 
-	g.CurrentPlayer = 0
-	
+	g.CurrentPlayerIndex = 0
+
 	return g
 }
 
@@ -154,13 +199,13 @@ func (g Game) CheckEnd() bool {
 	return false
 }
 
-func (g Game) NextTurn() {
+func (g Game) NextTurn() Game{
 	if g.CurrentPlayerIndex < len(g.Players)-1 {
 		g.CurrentPlayerIndex += 1
 	} else {
 		g.CurrentPlayerIndex = 0
 	}
-	return
+	return g
 }
 
 // board functions
@@ -190,24 +235,26 @@ func (b Board) Move(index, count int, direction string) Board {
 		fmt.Println("Invalid direction")
 		return b
 	}
-	fmt.Println("new position", newPos)
+	// fmt.Println("new position", newPos)
 	// remove the tiki from the chosen position
 	chosen := b.Tiki[index]
-	fmt.Println("chosen", chosen)
+	// fmt.Println("chosen", chosen)
 	b.Tiki = append(b.Tiki[:index], b.Tiki[index+1:]...)
-	fmt.Println("removed chosen tiki array", b.Tiki)
+	// fmt.Println("removed chosen tiki array", b.Tiki)
 	// insert tiki into position
 	b.Tiki = append(b.Tiki,Tiki{})
 	copy(b.Tiki[newPos+1:],b.Tiki[newPos:])
 	b.Tiki[newPos] = chosen
-	fmt.Println("inserted right array", b.Tiki)
-	fmt.Printf("Moving tiki %v by %v\n", chosen.Name, count)
+	// fmt.Println("inserted right array", b.Tiki)
+	// fmt.Printf("Moving tiki %v by %v\n", chosen.Name, count)
 	return b
 }
 
 func (b Board) Remove() Board {
-	lastIndex := len(b.Tiki)-1
-	b.Tiki = append(b.Tiki[:lastIndex], b.Tiki[lastIndex+1:]...)
+	// lastIndex := len(b.Tiki)-2
+	// b.Tiki = append(b.Tiki[:lastIndex], b.Tiki[lastIndex+1:]...)
+	// fmt.Println(b.Tiki)
+	b.Tiki = b.Tiki[:len(b.Tiki)-1]
 	return b
 }
 
@@ -259,7 +306,8 @@ func (p Player) Move(cardIndex int, posIndex int, b Board) (Player, Board) {
 		default:
 			fmt.Println("Invalid input")
 	}
-	p.Cards = append(p.Cards[:cardIndex], p.Cards[cardIndex+1:]...) // remove used card
+	// p.Cards = append(p.Cards[:cardIndex], p.Cards[cardIndex+1:]...) // remove used card
+	p.Cards[cardIndex] = Card{"NA","NA",0}
 	return p,b
 } 
 
